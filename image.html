@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, initial-scale=1.0">
+<title>NeuroSafe AI — CCTV HUD</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #00ff88;
+    --amber: #ffb800;
+    --red: #ff3333;
+    --dim: rgba(0,255,136,0.15);
+    --bg: #050a08;
+    --panel: rgba(0,20,12,0.85);
+    --border: rgba(0,255,136,0.3);
+  }
+
+  body {
+    width: 1280px;
+    height: 720px;
+    background: var(--bg);
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--green);
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* CRT vignette */
+  body::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.7) 100%);
+    pointer-events: none;
+    z-index: 101;
+  }
+
+  /* === VIDEO AREA === */
+  .video-zone {
+    position: absolute;
+    top: 60px;
+    left: 60px;
+    right: 60px;
+    bottom: 100px;
+    border: 1px solid var(--border);
+    background: rgba(0,8,4,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .video-placeholder {
+    color: rgba(0,255,136,0.2);
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  .video-placeholder span {
+    display: block;
+    font-size: 36px;
+    margin-bottom: 12px;
+    color: rgba(0,255,136,0.1);
+  }
+
+  /* === TOP BAR === */
+  .top-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 58px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 0;
+    z-index: 10;
+  }
+
+  .top-left {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex: 1;
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: 15px;
+    letter-spacing: 3px;
+    color: var(--green);
+    text-shadow: 0 0 12px rgba(0,255,136,0.6);
+  }
+
+  .logo span {
+    color: var(--amber);
+  }
+
+  .cam-id {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: rgba(0,255,136,0.6);
+    border-left: 1px solid var(--border);
+    padding-left: 24px;
+  }
+
+  .top-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+  }
+
+  .status-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  .dot.green { background: var(--green); animation: none; }
+  .dot.amber { background: var(--amber); animation: pulse 2s ease-in-out infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--amber); }
+    50% { opacity: 0.4; box-shadow: none; }
+  }
+
+  .top-right {
+    flex: 1;
+    display: flex;
+    justify: flex-end;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 24px;
+  }
+
+  .timestamp {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: var(--green);
+    text-shadow: 0 0 8px rgba(0,255,136,0.4);
+  }
+
+  .date {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(0,255,136,0.5);
+  }
+
+  /* === CORNER BRACKETS === */
+  .bracket {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    z-index: 10;
+  }
+
+  .bracket.tl { top: 62px; left: 62px; border-top: 2px solid var(--green); border-left: 2px solid var(--green); }
+  .bracket.tr { top: 62px; right: 62px; border-top: 2px solid var(--green); border-right: 2px solid var(--green); }
+  .bracket.bl { bottom: 102px; left: 62px; border-bottom: 2px solid var(--green); border-left: 2px solid var(--green); }
+  .bracket.br { bottom: 102px; right: 62px; border-bottom: 2px solid var(--green); border-right: 2px solid var(--green); }
+
+  /* === DETECTION BOXES === */
+  .detection-box {
+    position: absolute;
+    border: 2px solid;
+    z-index: 20;
+  }
+
+  .detection-box.person {
+    top: 120px;
+    left: 200px;
+    width: 160px;
+    height: 320px;
+    border-color: var(--green);
+    box-shadow: 0 0 10px rgba(0,255,136,0.3), inset 0 0 20px rgba(0,255,136,0.05);
+  }
+
+  .detection-box.object {
+    top: 280px;
+    left: 480px;
+    width: 80px;
+    height: 60px;
+    border-color: var(--red);
+    box-shadow: 0 0 12px rgba(255,51,51,0.5), inset 0 0 16px rgba(255,51,51,0.1);
+    animation: threat-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes threat-pulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(255,51,51,0.5), inset 0 0 16px rgba(255,51,51,0.1); }
+    50% { box-shadow: 0 0 24px rgba(255,51,51,0.9), inset 0 0 24px rgba(255,51,51,0.2); }
+  }
+
+  .detection-label {
+    position: absolute;
+    top: -22px;
+    left: -1px;
+    background: var(--green);
+    color: #000;
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 1.5px;
+    padding: 2px 6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .detection-label.danger {
+    background: var(--red);
+    color: #fff;
+  }
+
+  .conf-bar {
+    position: absolute;
+    bottom: -18px;
+    left: -1px;
+    font-size: 9px;
+    color: var(--green);
+    letter-spacing: 1px;
+  }
+
+  .conf-bar.danger { color: var(--red); }
+
+  /* Proximity line */
+  .proximity-line {
+    position: absolute;
+    top: 320px;
+    left: 362px;
+    width: 118px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--green), var(--red));
+    z-index: 21;
+    opacity: 0.7;
+  }
+
+  .proximity-label {
+    position: absolute;
+    top: 306px;
+    left: 380px;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--amber);
+    z-index: 22;
+  }
+
+  /* === RIGHT PANEL === */
+  .right-panel {
+    position: absolute;
+    top: 60px;
+    right: 0;
+    width: 58px;
+    bottom: 100px;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0;
+    gap: 20px;
+    z-index: 10;
+    background: var(--panel);
+  }
+
+  .right-panel-icon {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: rgba(0,255,136,0.5);
+  }
+
+  /* === BOTTOM BAR === */
+  .bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 98px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr 2fr 1fr;
+    padding: 12px 20px;
+    gap: 20px;
+    z-index: 10;
+  }
+
+  .panel-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .panel-label {
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: rgba(0,255,136,0.4);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+    margin-bottom: 2px;
+  }
+
+  .panel-value {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: var(--green);
+    line-height: 1.6;
+  }
+
+  .panel-value.alert {
+    color: var(--red);
+    text-shadow: 0 0 8px rgba(255,51,51,0.6);
+    font-family: 'Orbitron', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    animation: alert-flash 0.8s step-end infinite;
+  }
+
+  @keyframes alert-flash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .metric-bar-wrap {
+    flex: 1;
+    height: 4px;
+    background: rgba(0,255,136,0.1);
+    border: 1px solid var(--border);
+  }
+
+  .metric-bar-fill {
+    height: 100%;
+    background: var(--green);
+  }
+
+  .metric-bar-fill.high { background: var(--red); }
+  .metric-bar-fill.med { background: var(--amber); }
+
+  .metric-val {
+    font-size: 9px;
+    letter-spacing: 1px;
+    min-width: 30px;
+    text-align: right;
+  }
+
+  /* === CLASSIFICATION BANNER === */
+  .classification-banner {
+    position: absolute;
+    top: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,51,51,0.15);
+    border: 1px solid var(--red);
+    border-top: 3px solid var(--red);
+    padding: 8px 40px;
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: 14px;
+    letter-spacing: 6px;
+    color: var(--red);
+    text-shadow: 0 0 16px rgba(255,51,51,0.8);
+    z-index: 30;
+    animation: banner-pulse 1.2s ease-in-out infinite;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  @keyframes banner-pulse {
+    0%, 100% { background: rgba(255,51,51,0.15); box-shadow: 0 0 20px rgba(255,51,51,0.3); }
+    50% { background: rgba(255,51,51,0.25); box-shadow: 0 0 40px rgba(255,51,51,0.5); }
+  }
+
+  .classification-banner .sub {
+    display: block;
+    font-size: 8px;
+    letter-spacing: 4px;
+    color: rgba(255,51,51,0.7);
+    margin-top: 2px;
+    font-weight: 400;
+  }
+
+  /* === MINI MAP === */
+  .minimap {
+    position: absolute;
+    bottom: 108px;
+    right: 68px;
+    width: 100px;
+    height: 80px;
+    border: 1px solid var(--border);
+    background: rgba(0,255,136,0.03);
+    z-index: 15;
+  }
+
+  .minimap-label {
+    position: absolute;
+    top: -16px;
+    left: 0;
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: rgba(0,255,136,0.4);
+  }
+
+  .minimap-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    top: 30px;
+    left: 25px;
+    box-shadow: 0 0 6px var(--green);
+  }
+
+  .minimap-dot.threat {
+    background: var(--red);
+    top: 35px;
+    left: 55px;
+    box-shadow: 0 0 8px var(--red);
+    animation: threat-pulse 1.5s ease-in-out infinite;
+  }
+
+  /* grid overlay on minimap */
+  .minimap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.08) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* corner coords */
+  .coord {
+    position: absolute;
+    font-size: 8px;
+    letter-spacing: 1px;
+    color: rgba(0,255,136,0.3);
+    z-index: 11;
+  }
+  .coord.tl { top: 64px; left: 64px; }
+  .coord.tr { top: 64px; right: 64px; text-align: right; }
+  .coord.bl { bottom: 104px; left: 64px; }
+  .coord.br { bottom: 104px; right: 64px; text-align: right; }
+
+  /* streaming data on left side */
+  .stream-data {
+    position: absolute;
+    top: 70px;
+    left: 0;
+    width: 58px;
+    bottom: 100px;
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    padding: 12px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    z-index: 10;
+  }
+
+  .stream-label {
+    font-size: 7px;
+    letter-spacing: 2px;
+    color: rgba(0,255,136,0.35);
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    margin: auto;
+  }
+
+  .stream-val {
+    font-size: 9px;
+    color: var(--green);
+    text-align: center;
+    opacity: 0.7;
+  }
+</style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div class="top-left">
+      <div class="logo">NEURO<span>SAFE</span> AI</div>
+      <div class="cam-id">CAM-ID: NS-HOME-04 &nbsp;|&nbsp; ZONE: KITCHEN &nbsp;|&nbsp; RES: 1920×1080</div>
+    </div>
+    <div class="top-center">
+      <div class="status-chip"><div class="dot"></div> REC</div>
+      <div class="status-chip"><div class="dot green"></div> NEURAL LAYER ACTIVE</div>
+      <div class="status-chip"><div class="dot amber"></div> SYMBOLIC ENGINE ACTIVE</div>
+    </div>
+    <div class="top-right">
+      <div class="date">2026-03-05</div>
+      <div class="timestamp" id="clock">14:32:07</div>
+    </div>
+  </div>
+
+  <!-- LEFT STREAM PANEL -->
+  <div class="stream-data">
+    <div class="stream-label">INPUT STREAM</div>
+    <div class="stream-val">30fps</div>
+    <div class="stream-val">RTSP</div>
+    <div class="stream-val">H264</div>
+  </div>
+
+  <!-- VIDEO ZONE -->
+  <!-- <div class="video-zone" style="left:60px; right:60px;">
+    <div class="video-placeholder">
+      <span>▶</span>
+      INSERT VIDEO HERE<br>
+      <small style="letter-spacing:2px; font-size:10px;">DEMO CLIP 1 — CHILD + KNIFE SCENARIO</small>
+    </div>
+  </div> -->
+  <div class="video-zone" style="left:60px; right:60px;">
+  <video width="100%" height="100%" controls autoplay muted loop>
+    <source src= "./videos/kidknife_video.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+</div>
+
+  <!-- CORNER BRACKETS -->
+  <div class="bracket tl"></div>
+  <div class="bracket tr"></div>
+  <div class="bracket bl"></div>
+  <div class="bracket br"></div>
+
+  <!-- CORNER COORDINATES -->
+  <div class="coord tl">X:0000 Y:0000</div>
+  <div class="coord tr">X:1920 Y:0000</div>
+  <div class="coord bl">X:0000 Y:1080</div>
+  <div class="coord br">X:1920 Y:1080</div>
+
+  <!-- DETECTION BOXES -->
+  <!--<div class="detection-box person">-->
+  <!--  <div class="detection-label">PERSON — CHILD &nbsp; AGE:~7</div>-->
+  <!--  <div class="conf-bar">CONF: 96.4%</div>-->
+  <!--</div>-->
+
+  <!--<div class="detection-box object">-->
+  <!--  <div class="detection-label danger">⚠ KNIFE — SHARP OBJECT</div>-->
+  <!--  <div class="conf-bar danger">CONF: 98.1%</div>-->
+  <!--</div>-->
+
+  <!-- PROXIMITY LINE -->
+  <!--<div class="proximity-line"></div>-->
+  <!--<div class="proximity-label">PROX: 0.31m ⚠</div>-->
+
+  <!-- CLASSIFICATION BANNER -->
+  <div class="classification-banner">
+    ⚠ EMERGENCY DETECTED
+    <span class="sub">CHILD_NEAR_SHARP_OBJECT — RULE TRIGGERED — ALERTING NOW</span>
+  </div>
+
+  <!-- MINI MAP -->
+  <div class="minimap">
+    <div class="minimap-label">ROOM MAP</div>
+    <div class="minimap-dot"></div>
+    <div class="minimap-dot threat"></div>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottom-bar">
+    <div class="panel-section">
+      <div class="panel-label">Neural Detections</div>
+      <div class="metric-row">
+        <div class="panel-value" style="font-size:9px; min-width:80px;">PERSON (CHILD)</div>
+        <div class="metric-bar-wrap"><div class="metric-bar-fill" style="width:96%"></div></div>
+        <div class="metric-val">96%</div>
+      </div>
+      <div class="metric-row">
+        <div class="panel-value" style="font-size:9px; min-width:80px;">KNIFE</div>
+        <div class="metric-bar-wrap"><div class="metric-bar-fill high" style="width:98%"></div></div>
+        <div class="metric-val" style="color:var(--red)">98%</div>
+      </div>
+      <div class="metric-row">
+        <div class="panel-value" style="font-size:9px; min-width:80px;">POSE: REACHING</div>
+        <div class="metric-bar-wrap"><div class="metric-bar-fill med" style="width:91%"></div></div>
+        <div class="metric-val" style="color:var(--amber)">91%</div>
+      </div>
+    </div>
+
+    <div class="panel-section" style="align-items:center; justify-content:center;">
+      <div class="panel-label" style="text-align:center;">Symbolic Reasoning Output</div>
+      <div class="panel-value alert">⚠ EMERGENCY</div>
+      <div class="panel-value" style="font-size:9px; text-align:center; color:rgba(255,51,51,0.7); margin-top:2px;">
+        RULE: CHILD_NEAR_SHARP_OBJECT &nbsp;|&nbsp; PROX: 0.31m &lt; 0.5m &nbsp;|&nbsp; DURATION: 4s
+      </div>
+    </div>
+
+    <div class="panel-section" style="align-items:flex-end;">
+      <div class="panel-label">System Status</div>
+      <div class="panel-value" style="font-size:9px; text-align:right; line-height:2;">
+        YOLO v8 &nbsp;<span style="color:var(--green)">●</span><br>
+        MEDIAPIPE &nbsp;<span style="color:var(--green)">●</span><br>
+        RULE ENGINE &nbsp;<span style="color:var(--red)">●</span> TRIGGERED<br>
+        ALERT SENT &nbsp;<span style="color:var(--amber)">●</span> 14:32:07
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Live clock
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2,'0');
+      const m = String(now.getMinutes()).padStart(2,'0');
+      const s = String(now.getSeconds()).padStart(2,'0');
+      document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+  </script>
+</body>
+</html>
