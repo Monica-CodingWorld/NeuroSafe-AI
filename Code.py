@@ -13,7 +13,7 @@ print("Fire model loaded...")
 # CONFIG
 # -------------------------------------------------
 
-VIDEO_PATH = "child_playingScissors.mp4"     # recorded video
+VIDEO_PATH = "child_fire.mp4"     # recorded video
 ENVIRONMENT = "home"          # "house" or "hospital"
 
 DASHBOARD_URL = "http://localhost:5000/alert"
