@@ -53,11 +53,11 @@ This allows the system to move from:
 
 ## 🧪 How It Works
 
-Capture live video feed from CCTV
-Detect objects using YOLO
-Apply symbolic rules to analyze context
-Identify risky scenarios
-Trigger alert (sound + notification)
+- Capture live video feed from CCTV
+- Detect objects using YOLO
+- Apply symbolic rules to analyze context
+- Identify risky scenarios
+- Trigger alert (sound + notification)
 
 ## 📊 Project Architecture
 
@@ -89,5 +89,5 @@ demo video -
 - Custom scenario training
 
 # 🤝 Contributors
-**Team Leader- Monica**
-**Team Members - Palak Das, Viraj Shah**
+- **Team Leader- Monica**
+- **Team Members - Palak Das, Viraj Shah**
