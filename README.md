@@ -78,7 +78,7 @@ Competed among 53 teams → Top 13 finalists
 
 # 📸 Demo
 
-demo video - 
+demo video - https://github.com/Monica-CodingWorld/NeuroSafe-AI/blob/main/kid_with_knife.mp4
 
 # 🔮 Future Scope
 
